@@ -6,7 +6,7 @@ function rewrite(apiPath, extensions, req, next) {
 	const url = req.url.split("?");
 	const b = `${url[0]}/${req.method}`;
 	const mapped = extensions.some(ext => {
-		const resourcePath = `${b}.${ext}`;
+		const resourcePath = url[1] ? `${b}_${decodeURIComponent(url[1])}.${ext}` : `${b}.${ext}`;
 		const filePath = Path.posix.join(apiPath, resourcePath);
 		if (FS.existsSync(filePath)) {
 			req.url = resourcePath;
@@ -21,18 +21,20 @@ function rewrite(apiPath, extensions, req, next) {
 module.exports = (api, projectOptions) => {
 	api.configureDevServer((app, server) => {
 		const config = projectOptions.pluginOptions["serve-api-mocks"];
-		config.routes.forEach(route => {
-			const relative = route.relative === undefined ? true : route.relative;
-			let path = route.path || "/";
-			if (relative) {
-				path = Path.posix.join(config.base, path);
-			}
-			if (route.method) {
-				app[route.method.toLowerCase()](path, route.callback);
-			} else {
-				app.use(path, route.callback);
-			}
-		});
+		if (config.base && config.routes) {
+			config.routes.forEach(route => {
+				const relative = route.relative === undefined ? true : route.relative;
+				let path = route.path || "/";
+				if (relative) {
+					path = Path.posix.join(config.base, path);
+				}
+				if (route.method) {
+					app[route.method.toLowerCase()](path, route.callback);
+				} else {
+					app.use(path, route.callback);
+				}
+			});
+		}
 		console.log(`\nserve-api-mocks: ${config.base}\n`);
 		const apiPath = api.resolve(`.${config.base}`);
 		const extensions = config.extensions || ["json", "jpg", "html", "pdf", "png", "txt"];
